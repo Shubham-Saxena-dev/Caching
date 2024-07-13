@@ -1,0 +1,51 @@
+name: Go CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.17'
+
+      - name: Go mod tidy
+        run: go mod tidy
+
+      - name: Build
+        run: |
+          go build -v ./...
+
+      - name: Test
+        run: |
+          go test -v ./...
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'  # Deploy only on main branch
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build and push Docker image
+        env:
+          REGISTRY_URL: ${{ secrets.REGISTRY_URL }}
+          CONTAINER_IMAGE: ${{ secrets.REGISTRY_URL }}/my-app:${{ github.sha }}
+        run: |
+          docker buildx build --platform linux/amd64 -t $CONTAINER_IMAGE .
+          docker push $CONTAINER_IMAGE
